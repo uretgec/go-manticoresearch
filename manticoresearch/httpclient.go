@@ -28,8 +28,8 @@ func RegisterUHCDebugEnable() UHCOption {
 	}
 }
 
-const DefaultUHCName = "MyBakbibuBot"
-const DefaultUHCUserAgent = "Mozilla/5.0 (compatible; MyBakbibuBot/1.0; +https://bakbibu.com)"
+const DefaultUHCName = "MyManticoreSearchBot"
+const DefaultUHCUserAgent = "Mozilla/5.0 (compatible; MyManticoreSearchBot/1.0; +https://manticoresearch.com)"
 const DefaultUHCTimeout = 30 // seconds
 
 type HttpClient struct {

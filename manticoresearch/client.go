@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"mybakbibu/internal/bcore"
 	"strings"
 )
 
@@ -15,8 +14,8 @@ type MCOption func(*ManticoreClient)
 func RegisterMCDefaultHttpClient() MCOption {
 	return func(m *ManticoreClient) {
 		m.client = &HttpClient{
-			name:    bcore.DefaultUHCUserAgent,
-			timeout: bcore.DefaultUHCTimeout,
+			name:    DefaultUHCUserAgent,
+			timeout: DefaultUHCTimeout,
 			reuse:   false,
 			debug:   false,
 		}

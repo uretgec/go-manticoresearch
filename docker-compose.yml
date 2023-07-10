@@ -1,0 +1,8 @@
+version: '3.8'
+
+services:
+  # Search Services
+  mymanticore:
+    extends:
+      file: common-services.yml
+      service: mymanticore

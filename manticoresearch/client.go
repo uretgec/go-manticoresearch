@@ -197,6 +197,12 @@ func (m *ManticoreClient) ShowTables() (resp *MCDocumentMainResponse, err error)
 func (m *ManticoreClient) ShowTableStatus(tableName string) (resp *MCDocumentMainResponse, err error) {
 	return m.RunCli([]byte(fmt.Sprintf("SHOW TABLE %s STATUS", tableName)))
 }
+
+// https://manual.manticoresearch.com/Creating_a_table/Local_tables/Plain_and_real-time_table_settings#How-to-change-rt_mem_limit-and-optimize_cutoff
+func (m *ManticoreClient) ReconfigureTable(tableName string) (resp *MCDocumentMainResponse, err error) {
+	return m.RunCli([]byte(fmt.Sprintf("ALTER TABLE %s RECONFİGURE", tableName)))
+}
+
 func (m *ManticoreClient) DescTable(tableName string) (resp *MCDocumentMainResponse, err error) {
 	return m.RunCli([]byte(fmt.Sprintf("DESC %s", tableName)))
 }
@@ -233,6 +239,17 @@ func (m *ManticoreClient) KillQuery(id int) (resp *interface{}, err error) {
 	}
 
 	return m.RunCliRaw([]byte(fmt.Sprintf("KILL %d", id)))
+}
+
+// FLUSH TABLE forcefully flushes RT table RAM chunk contents to disk.
+// The real-time table RAM chunk is automatically flushed to disk during a clean shutdown, or periodically every rt_flush_period seconds. Default: 10 hours
+// Issuing a FLUSH TABLE command not only forces the RAM chunk contents to be written to disk but also triggers the cleanup of binary log files.
+func (m *ManticoreClient) FlushTable(tableName string) (resp *MCDocumentMainResponse, err error) {
+	if m.IsReadOnly() {
+		return nil, errors.New("readonly mode active")
+	}
+
+	return m.RunCli([]byte(fmt.Sprintf("FLUSH TABLE %s", tableName)))
 }
 
 // Flushes all in-memory attribute updates in all the active disk tables to disk. Returns a tag that identifies the result on-disk state (basically, a number of actual disk attribute saves performed since the server startup).
@@ -567,8 +584,24 @@ Escape Characters: !    "    $    '    (    )    -    /    <    @    \    ^    |
 
 All full-text match clauses can be combined with must, must_not and should operators of an HTTP bool query.
 */
-func (m *ManticoreClient) Search(builder McSearchQueryBuilder, profile bool) error {
-	return nil
+func (m *ManticoreClient) Search(builder *McSearchQueryBuilder) (resp *McSearchResponse, err error) {
+	// Request
+	code, body, errs := m.client.PostJSON(m.generateUrl([]string{MCApiRouteSearch}), &builder)
+	if len(errs) > 0 {
+		return nil, errs[0]
+	}
+
+	if m.client.debug {
+		// fmt.Printf("\nBody: %s - Status: %d\n", string(body), code)
+		fmt.Printf("\nBody: %s - Status: %d\n", "", code)
+	}
+
+	err = json.Unmarshal(body, &resp)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
 }
 
 /*

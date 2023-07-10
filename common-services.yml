@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  mymanticore:
+    container_name: mymanticore
+    image: manticoresearch/manticore
+    hostname: mymanticore
+    restart: always
+    environment:
+      - EXTRA=1 # columnar lib + buddy
+      - QUERY_LOG_TO_STDOUT=true
+      # - MCL=1 # only columnar lib
+    ports:
+      # - 127.0.0.1:9304:9304 # mysql
+      # - 127.0.0.1:9305:9305 # mysql readonly
+      # - 127.0.0.1:9306:9306 # mysql vip
+      # - 127.0.0.1:9307:9307 # mysql vip
+      - 127.0.0.1:9308:9308 # http
+      - 127.0.0.1:9309:9309 # http readonly
+      - 127.0.0.1:9310:9310 # http vip
+      - 9312:9312 # http binary api
+      # - 9312:9312 # cluster
+    ulimits:
+      nproc: 65535
+      nofile:
+         soft: 65535
+         hard: 65535
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - ./data/db:/var/lib/manticore
+      - ./data/manticore.conf:/etc/manticoresearch/manticore.conf

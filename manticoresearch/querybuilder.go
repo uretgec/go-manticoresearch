@@ -27,11 +27,11 @@ type McSearchQueryBuilder struct {
 	Profile bool `json:"profile,omitempty" redis:"profile"`
 
 	// index name or table name
-	Index   string `json:"index" redis:"index"`
-	Options string `json:"options" redis:"options"`
+	Index   string     `json:"index" redis:"index"`
+	Options *McOptions `json:"options,omitempty" redis:"options"`
 
 	// Query Options
-	Query McQueryOptions `json:"query,omitempty" redis:"query"`
+	Query *McQueryOptions `json:"query,omitempty" redis:"query"`
 
 	// Source
 	// Each entry can be an attribute name or a wildcard (*, % and ? symbols are supported)
@@ -44,7 +44,7 @@ type McSearchQueryBuilder struct {
 	// Highlight interface{} `json:"highlight,omitempty" redis:"highlight"`
 
 	// Sorting
-	Sort []interface{} `json:"sort,omitempty" redis:"sort"`
+	Sort interface{} `json:"sort,omitempty" redis:"sort"`
 	// Sorting With: You can enable weight calculation by setting the track_scores property to true
 	TrackScores bool `json:"track_scores,omitempty" redis:"track_scores"`
 
@@ -81,6 +81,40 @@ func (mc *McSearchQueryBuilder) UnmarshalBinary(data []byte) error {
 
 	return nil
 }
+
+// Profile: get full-text query tree structure
+func (qb *McSearchQueryBuilder) SetProfile(profile bool) *McSearchQueryBuilder {
+	qb.Profile = profile
+
+	return qb
+}
+
+// index name or table name
+func (qb *McSearchQueryBuilder) SetIndex(indexName string) *McSearchQueryBuilder {
+	qb.Index = indexName
+
+	return qb
+}
+
+// SELECT * FROM test WHERE MATCH('@title hello @body world') OPTION ranker=bm25, max_matches=3000,
+func (qb *McSearchQueryBuilder) SetOptions(options *McOptions) *McSearchQueryBuilder {
+	qb.Options = options
+
+	return qb
+}
+func (qb *McSearchQueryBuilder) SetQuery(query *McQueryOptions) *McSearchQueryBuilder {
+	qb.Query = query
+
+	return qb
+}
+
+// Sorting
+func (qb *McSearchQueryBuilder) SetSort(opt McSortOptions) *McSearchQueryBuilder {
+	qb.Sort = opt.Sorts
+
+	return qb
+}
+
 func (qb *McSearchQueryBuilder) SetLimit(limit int64) *McSearchQueryBuilder {
 	qb.Limit = limit
 
@@ -135,7 +169,7 @@ func (qb *McSearchQueryBuilder) AddExp(field string, exp string) *McSearchQueryB
 }
 
 // Query Match Options
-func (qb *McSearchQueryBuilder) AddQueryMatchOptions(opt McQueryOptions) *McSearchQueryBuilder {
+func (qb *McSearchQueryBuilder) AddQueryMatchOptions(opt *McQueryOptions) *McSearchQueryBuilder {
 	qb.Query = opt
 
 	return qb

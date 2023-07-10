@@ -1,6 +1,5 @@
 package manticoresearch
 
-
 // Sorting Options
 /*
 "sort": [ "_score", "id" ]
@@ -17,6 +16,12 @@ const (
 
 type McSortOptions struct {
 	Sorts []interface{}
+}
+
+func NewMcSortOptions() McSortOptions {
+	return McSortOptions{
+		Sorts: []interface{}{},
+	}
 }
 
 func (qb McSortOptions) MultiField(fields ...string) McSortOptions {

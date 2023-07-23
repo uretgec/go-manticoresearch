@@ -13,9 +13,10 @@ type McQueryOptions struct {
 	MatchAll    *interface{}            `json:"match_all,omitempty" redis:"match_all"`
 
 	// Various-filters
-	Equals *map[string]interface{}  `json:"equals,omitempty" redis:"equals"`
-	In     *map[string]interface{}  `json:"in,omitempty" redis:"in"`
-	Range  *map[string]McQueryRange `json:"range,omitempty" redis:"range"`
+	Equals *map[string]interface{}   `json:"equals,omitempty" redis:"equals"`
+	In     *map[string]interface{}   `json:"in,omitempty" redis:"in"`
+	Range  *map[string]McQueryRange  `json:"range,omitempty" redis:"range"`
+	Bool   *map[string][]interface{} `json:"bool,omitempty" redis:"bool"`
 }
 
 type McQueryMatchOperator struct {
@@ -178,7 +179,7 @@ Example:
 ```
 */
 func (qb *McQueryOptions) AddQueryString(queryString string) *McQueryOptions {
-	(*qb.QueryString) = queryString
+	qb.QueryString = &queryString
 
 	return qb
 }
@@ -249,7 +250,7 @@ func (qb *McQueryOptions) AddEqualsAll(k string, v interface{}) *McQueryOptions 
 	return qb
 }
 
-func (qb *McQueryOptions) AddIn(k string, v []int) *McQueryOptions {
+func (qb *McQueryOptions) AddIn(k string, v []int64) *McQueryOptions {
 	if qb.In == nil {
 		qb.In = &map[string]interface{}{}
 	}
@@ -260,7 +261,7 @@ func (qb *McQueryOptions) AddIn(k string, v []int) *McQueryOptions {
 }
 
 // any() (equivalent to no function) which will be positive if there's at least one match between the attribute values and the queried values;
-func (qb *McQueryOptions) AddInAny(k string, v []int) *McQueryOptions {
+func (qb *McQueryOptions) AddInAny(k string, v []int64) *McQueryOptions {
 	if qb.In == nil {
 		qb.In = &map[string]interface{}{}
 	}
@@ -271,7 +272,7 @@ func (qb *McQueryOptions) AddInAny(k string, v []int) *McQueryOptions {
 }
 
 // all() which will be positive if all the attribute values are in the queried set
-func (qb *McQueryOptions) AddInAll(k string, v []int) *McQueryOptions {
+func (qb *McQueryOptions) AddInAll(k string, v []int64) *McQueryOptions {
 	if qb.In == nil {
 		qb.In = &map[string]interface{}{}
 	}
@@ -299,3 +300,223 @@ func (qb *McQueryOptions) AddRange(k string, v McQueryRange) *McQueryOptions {
 }
 
 // TODO: Geo Distance - https://manual.manticoresearch.com/Searching/Filters#Geo-distance-filters
+
+/*
+Query/Bool
+
+Bool query matches documents matching boolean combinations of other queries and/or filters. Queries and filters must be specified in must, should or must_not sections and can be nested.
+Via: https://manual.manticoresearch.com/Searching/Filters#bool-query
+
+Example:
+```
+
+	"query": {
+		"bool": {
+			"should": [
+				{
+				"equals": {
+					"b": 1
+				}
+				},
+				{
+				"equals": {
+					"b": 3
+				}
+				}
+			],
+			"must": [
+				{
+				"equals": {
+					"a": 1
+				}
+				}
+			],
+			"must_not": {
+				"equals": {
+				"b": 2
+				}
+			}
+		}
+	}
+
+```
+*/
+const (
+	McQueryMatchFilterBool = "bool"
+)
+const (
+	McQueryMatchFilterSectionMust    = "must"
+	McQueryMatchFilterSectionShould  = "should"
+	McQueryMatchFilterSectionMustNot = "must_not"
+)
+const (
+	McQueryMatchFilterVariousMatch  = "match"
+	McQueryMatchFilterVariousEquals = "equals"
+	McQueryMatchFilterVariousIn     = "in"
+)
+const (
+	McQueryMatchKeyAny = "any"
+	McQueryMatchKeyAll = "all"
+)
+
+// MUST
+func (qb *McQueryOptions) AddBoolMustMatch(fields []string, keyword string) *McQueryOptions {
+	qb.addBoolSectionFilterData(McQueryMatchFilterSectionMust, McQueryMatchFilterVariousMatch, "", strings.Join(fields, ","), keyword)
+	return qb
+}
+func (qb *McQueryOptions) AddBoolMustNotMatch(field string, keyword string) *McQueryOptions {
+	qb.addBoolSectionFilterData(McQueryMatchFilterSectionMust, McQueryMatchFilterVariousEquals, "", fmt.Sprintf("!%s", field), keyword)
+	return qb
+}
+func (qb *McQueryOptions) AddBoolMustMatchAll(keyword string) *McQueryOptions {
+	qb.addBoolSectionFilterData(McQueryMatchFilterSectionMust, McQueryMatchFilterVariousEquals, "", "_all", keyword)
+	return qb
+}
+func (qb *McQueryOptions) AddBoolMustOrMatch(fields []string, keyword string) *McQueryOptions {
+	qb.addBoolSectionFilterData(McQueryMatchFilterSectionMust, McQueryMatchFilterVariousEquals, "", strings.Join(fields, ","), McQueryMatchOperator{
+		Query:    keyword,
+		Operator: McSearchOperatorOR,
+	})
+	return qb
+}
+func (qb *McQueryOptions) AddBoolMustAndMatch(fields []string, keyword string) *McQueryOptions {
+	qb.addBoolSectionFilterData(McQueryMatchFilterSectionMust, McQueryMatchFilterVariousEquals, "", strings.Join(fields, ","), McQueryMatchOperator{
+		Query:    keyword,
+		Operator: McSearchOperatorAND,
+	})
+	return qb
+}
+func (qb *McQueryOptions) AddBoolMustEquals(k string, v interface{}) *McQueryOptions {
+	qb.addBoolSectionFilterData(McQueryMatchFilterSectionMust, McQueryMatchFilterVariousEquals, "", k, v)
+	return qb
+}
+
+func (qb *McQueryOptions) AddBoolMustEqualsAny(k string, v interface{}) *McQueryOptions {
+	qb.addBoolSectionFilterData(McQueryMatchFilterSectionMust, McQueryMatchFilterVariousEquals, McQueryMatchKeyAny, k, v)
+	return qb
+}
+
+func (qb *McQueryOptions) AddBoolMustEqualsAll(k string, v interface{}) *McQueryOptions {
+	qb.addBoolSectionFilterData(McQueryMatchFilterSectionMust, McQueryMatchFilterVariousEquals, McQueryMatchKeyAll, k, v)
+	return qb
+}
+
+func (qb *McQueryOptions) AddBoolMustEqualsIn(k string, v []int64) *McQueryOptions {
+	qb.addBoolSectionFilterData(McQueryMatchFilterSectionMust, McQueryMatchFilterVariousIn, "", k, v)
+	return qb
+}
+
+func (qb *McQueryOptions) AddBoolMustEqualsInAny(k string, v []int64) *McQueryOptions {
+	qb.addBoolSectionFilterData(McQueryMatchFilterSectionMust, McQueryMatchFilterVariousIn, McQueryMatchKeyAny, k, v)
+	return qb
+}
+
+func (qb *McQueryOptions) AddBoolMustEqualsInAll(k string, v []int64) *McQueryOptions {
+	qb.addBoolSectionFilterData(McQueryMatchFilterSectionMust, McQueryMatchFilterVariousIn, McQueryMatchKeyAll, k, v)
+	return qb
+}
+
+// MUST NOT
+func (qb *McQueryOptions) AddBoolMustNotEquals(k string, v interface{}) *McQueryOptions {
+	qb.addBoolSectionFilterData(McQueryMatchFilterSectionMustNot, McQueryMatchFilterVariousEquals, "", k, v)
+	return qb
+}
+
+func (qb *McQueryOptions) AddBoolMustNotEqualsAny(k string, v interface{}) *McQueryOptions {
+	qb.addBoolSectionFilterData(McQueryMatchFilterSectionMustNot, McQueryMatchFilterVariousEquals, McQueryMatchKeyAny, k, v)
+	return qb
+}
+
+func (qb *McQueryOptions) AddBoolMustNotEqualsAll(k string, v interface{}) *McQueryOptions {
+	qb.addBoolSectionFilterData(McQueryMatchFilterSectionMustNot, McQueryMatchFilterVariousEquals, McQueryMatchKeyAll, k, v)
+	return qb
+}
+
+func (qb *McQueryOptions) AddBoolMustNotEqualsIn(k string, v []int64) *McQueryOptions {
+	qb.addBoolSectionFilterData(McQueryMatchFilterSectionMustNot, McQueryMatchFilterVariousIn, "", k, v)
+	return qb
+}
+
+func (qb *McQueryOptions) AddBoolMustNotEqualsInAny(k string, v []int64) *McQueryOptions {
+	qb.addBoolSectionFilterData(McQueryMatchFilterSectionMustNot, McQueryMatchFilterVariousIn, McQueryMatchKeyAny, k, v)
+	return qb
+}
+
+func (qb *McQueryOptions) AddBoolMustNotEqualsInAll(k string, v []int64) *McQueryOptions {
+	qb.addBoolSectionFilterData(McQueryMatchFilterSectionMustNot, McQueryMatchFilterVariousIn, McQueryMatchKeyAll, k, v)
+	return qb
+}
+
+// SHOULD
+func (qb *McQueryOptions) AddBoolShouldEquals(k string, v interface{}) *McQueryOptions {
+	qb.addBoolSectionFilterData(McQueryMatchFilterSectionShould, McQueryMatchFilterVariousEquals, "", k, v)
+	return qb
+}
+
+func (qb *McQueryOptions) AddBoolShouldEqualsAny(k string, v interface{}) *McQueryOptions {
+	qb.addBoolSectionFilterData(McQueryMatchFilterSectionShould, McQueryMatchFilterVariousEquals, McQueryMatchKeyAny, k, v)
+	return qb
+}
+
+func (qb *McQueryOptions) AddBoolShouldEqualsAll(k string, v interface{}) *McQueryOptions {
+	qb.addBoolSectionFilterData(McQueryMatchFilterSectionShould, McQueryMatchFilterVariousEquals, McQueryMatchKeyAll, k, v)
+	return qb
+}
+
+func (qb *McQueryOptions) AddBoolShouldEqualsIn(k string, v []int64) *McQueryOptions {
+	qb.addBoolSectionFilterData(McQueryMatchFilterSectionShould, McQueryMatchFilterVariousIn, "", k, v)
+	return qb
+}
+
+func (qb *McQueryOptions) AddBoolShouldEqualsInAny(k string, v []int64) *McQueryOptions {
+	qb.addBoolSectionFilterData(McQueryMatchFilterSectionShould, McQueryMatchFilterVariousIn, McQueryMatchKeyAny, k, v)
+	return qb
+}
+
+func (qb *McQueryOptions) AddBoolShouldEqualsInAll(k string, v []int64) *McQueryOptions {
+	qb.addBoolSectionFilterData(McQueryMatchFilterSectionShould, McQueryMatchFilterVariousIn, McQueryMatchKeyAll, k, v)
+	return qb
+}
+
+// Private Methods
+// func (qb *McQueryOptions) generateMatchData(matchKey string, k string, v interface{}) (data map[string]interface{}) {
+// 	if matchKey == McQueryMatchKeyAny || matchKey == McQueryMatchKeyAll {
+// 		k = fmt.Sprintf("%s(%s)", matchKey, k)
+// 	}
+
+// 	return map[string]interface{}{
+// 		k: v,
+// 	}
+// }
+
+// func (qb *McQueryOptions) generateVariousFilterData(variousKey string, matchKey string, k string, v interface{}) (data map[string]interface{}) {
+// 	if matchKey == McQueryMatchKeyAny || matchKey == McQueryMatchKeyAll {
+// 		k = fmt.Sprintf("%s(%s)", matchKey, k)
+// 	}
+
+// 	vd := map[string]interface{}{}
+// 	vd[variousKey] = map[string]interface{}{
+// 		k: v,
+// 	}
+
+// 	return vd
+// }
+
+func (qb *McQueryOptions) addBoolSectionFilterData(sectionKey string, variousKey string, matchKey string, k string, v interface{}) (data map[string]interface{}) {
+	if qb.Bool == nil {
+		qb.Bool = &map[string][]interface{}{}
+	}
+
+	if matchKey == McQueryMatchKeyAny || matchKey == McQueryMatchKeyAll {
+		k = fmt.Sprintf("%s(%s)", matchKey, k)
+	}
+
+	vd := map[string]interface{}{}
+	vd[variousKey] = map[string]interface{}{
+		k: v,
+	}
+
+	(*qb.Bool)[sectionKey] = append((*qb.Bool)[sectionKey], vd)
+
+	return vd
+}

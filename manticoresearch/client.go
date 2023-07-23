@@ -592,8 +592,7 @@ func (m *ManticoreClient) Search(builder *McSearchQueryBuilder) (resp *McSearchR
 	}
 
 	if m.client.debug {
-		// fmt.Printf("\nBody: %s - Status: %d\n", string(body), code)
-		fmt.Printf("\nBody: %s - Status: %d\n", "", code)
+		fmt.Printf("\nBody: %s - Status: %d\n", string(body), code)
 	}
 
 	err = json.Unmarshal(body, &resp)

@@ -50,7 +50,7 @@ type McSearchQueryBuilder struct {
 
 	// Group: Aggregation and Facet
 	// "aggs": {"<aggr_name>": {"terms": {"field": "<attribute>","size": <int value>}}
-	Aggs map[string]McAggregationTerms `json:"aggs,omitempty" redis:"aggs"`
+	Aggs map[string]McAggregation `json:"aggs,omitempty" redis:"aggs"`
 
 	// Facets can aggregate over expressions.
 	// "expressions": {"price_range": "INTERVAL(price,200,400,600,800)"}
@@ -108,9 +108,28 @@ func (qb *McSearchQueryBuilder) SetQuery(query *McQueryOptions) *McSearchQueryBu
 	return qb
 }
 
+// Source
+func (qb *McSearchQueryBuilder) SetSource(attr ...string) *McSearchQueryBuilder {
+	qb.Source = attr
+
+	return qb
+}
+func (qb *McSearchQueryBuilder) SetSourceMultiOptions(opt McSourceMultiOptions) *McSearchQueryBuilder {
+	qb.Source = opt
+
+	return qb
+}
+
 // Sorting
 func (qb *McSearchQueryBuilder) SetSort(opt McSortOptions) *McSearchQueryBuilder {
 	qb.Sort = opt.Sorts
+
+	return qb
+}
+
+// Calculate Scores
+func (qb *McSearchQueryBuilder) SetTrackScores(enabled bool) *McSearchQueryBuilder {
+	qb.TrackScores = enabled
 
 	return qb
 }
@@ -137,40 +156,6 @@ func (qb *McSearchQueryBuilder) SetFrom(from int64) *McSearchQueryBuilder {
 }
 func (qb *McSearchQueryBuilder) SetMaxMatches(limit int64) *McSearchQueryBuilder {
 	qb.MaxMatches = limit
-
-	return qb
-}
-
-// Aggregation Options - Facet Query Options
-type McAggregationTerms struct {
-	Field string `json:"field"` // value must contain the name of the attribute or expression we are faceting
-	// By default each facet result set is limited to 20 values.
-	Size int `json:"size,omitempty"` // optional size specifies the maximum number of buckets to include into the result. When not specified it inherits the main query's limit.
-}
-
-func (qb *McSearchQueryBuilder) AddAgg(aggName string, field string, size int) *McSearchQueryBuilder {
-	agg := McAggregationTerms{
-		Field: field,
-	}
-
-	if size > 0 {
-		agg.Size = size
-	}
-
-	qb.Aggs[aggName] = agg
-
-	return qb
-}
-
-func (qb *McSearchQueryBuilder) AddExp(field string, exp string) *McSearchQueryBuilder {
-	qb.Expressions[field] = exp
-
-	return qb
-}
-
-// Query Match Options
-func (qb *McSearchQueryBuilder) AddQueryMatchOptions(opt *McQueryOptions) *McSearchQueryBuilder {
-	qb.Query = opt
 
 	return qb
 }

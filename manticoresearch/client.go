@@ -13,12 +13,10 @@ type MCOption func(*ManticoreClient)
 
 func RegisterMCDefaultHttpClient() MCOption {
 	return func(m *ManticoreClient) {
-		m.client = &HttpClient{
-			name:    DefaultUHCUserAgent,
-			timeout: DefaultUHCTimeout,
-			reuse:   false,
-			debug:   false,
-		}
+		m.client = New(
+			RegisterUHCDefault(DefaultUHCUserAgent, DefaultUHCTimeout),
+			RegisterUHCDebugMode(false),
+		)
 	}
 }
 
@@ -32,12 +30,10 @@ func RegisterMCHttpClient(name string, timeout int64, reuse bool, debug bool) MC
 			timeout = DefaultUHCTimeout
 		}
 
-		m.client = &HttpClient{
-			name:    name,
-			timeout: timeout,
-			reuse:   reuse,
-			debug:   debug,
-		}
+		m.client = New(
+			RegisterUHCDefault(name, timeout),
+			RegisterUHCDebugMode(debug),
+		)
 	}
 }
 
@@ -98,9 +94,9 @@ func (m ManticoreClient) generateUrl(args []string) string {
 
 // Info
 func (m *ManticoreClient) Info() (resp *McInfoResponse, err error) {
-	code, body, errs := m.client.Get(m.generateUrl([]string{}))
-	if len(errs) > 0 {
-		return nil, errs[0]
+	code, body, err := m.client.Get(m.generateUrl([]string{}))
+	if err != nil {
+		return nil, err
 	}
 
 	if m.client.debug {
@@ -108,10 +104,10 @@ func (m *ManticoreClient) Info() (resp *McInfoResponse, err error) {
 	}
 
 	if err := json.Unmarshal(body, &resp); err != nil {
-		errs = append(errs, err)
+		return nil, err
 	}
 
-	return resp, errs[0]
+	return resp, err
 }
 
 /*
@@ -134,9 +130,9 @@ Endpoint: POST /cli
 The /cli endpoint accepts any SQL query and returns the response in raw format, similar to what you would receive via mysql. Unlike the /sql and /sql?mode=raw endpoints, the query parameter should not be URL-encoded. This endpoint is intended for manual actions using a browser or command line HTTP clients such as curl. It is not recommended to use the /cli endpoint in scripts.
 */
 func (m *ManticoreClient) RunCli(payload []byte) (resp *MCDocumentMainResponse, err error) {
-	code, body, errs := m.client.Post(m.generateUrl([]string{MCApiRouteCli}), payload)
-	if len(errs) > 0 {
-		return nil, errs[0]
+	code, body, err := m.client.Post(m.generateUrl([]string{MCApiRouteCli}), payload)
+	if err != nil {
+		return nil, err
 	}
 
 	if m.client.debug {
@@ -165,9 +161,9 @@ func (m *ManticoreClient) RunCli(payload []byte) (resp *MCDocumentMainResponse, 
 
 // return only unknown interface
 func (m *ManticoreClient) RunCliRaw(payload []byte) (resp *interface{}, err error) {
-	code, body, errs := m.client.Post(m.generateUrl([]string{MCApiRouteCli}), payload)
-	if len(errs) > 0 {
-		return nil, errs[0]
+	code, body, err := m.client.Post(m.generateUrl([]string{MCApiRouteCli}), payload)
+	if err != nil {
+		return nil, err
 	}
 
 	if m.client.debug {
@@ -254,12 +250,23 @@ func (m *ManticoreClient) FlushTable(tableName string) (resp *MCDocumentMainResp
 
 // Flushes all in-memory attribute updates in all the active disk tables to disk. Returns a tag that identifies the result on-disk state (basically, a number of actual disk attribute saves performed since the server startup).
 // Look at: attr_flush_period setting (attr_flush_period = 900 # persist updates to disk every 15 minutes)
-func (m *ManticoreClient) FlushAttributes(tableName string) (resp *MCDocumentMainResponse, err error) {
+func (m *ManticoreClient) FlushAttributes() (resp *MCDocumentMainResponse, err error) {
 	if m.IsReadOnly() {
 		return nil, errors.New("readonly mode active")
 	}
 
 	return m.RunCli([]byte("FLUSH ATTRIBUTES"))
+}
+
+// In addition, the FLUSH LOGS SQL command is available, which works same as system USR1 signal.
+// Initiate reopen of searchd log and query log files, letting you implement log file rotation.
+// Command is non-blocking (i.e., returns immediately).
+func (m *ManticoreClient) FlushLogs() (resp *MCDocumentMainResponse, err error) {
+	if m.IsReadOnly() {
+		return nil, errors.New("readonly mode active")
+	}
+
+	return m.RunCli([]byte("FLUSH LOGS"))
 }
 
 // OPTIMIZE merges the RT table's disk chunks down to the number which equals to # of CPU cores * 2 by default. The number of optimized disk chunks can be controlled with option cutoff.
@@ -414,10 +421,13 @@ func (m *ManticoreClient) upsert(action string, v MCDocumentUpsertRequest) (resp
 		return nil, errors.New("readonly mode active")
 	}
 
+	// payload
+	payload, _ := v.MarshalBinary()
+
 	// Request
-	code, body, errs := m.client.PostJSON(m.generateUrl([]string{action}), v)
-	if len(errs) > 0 {
-		return nil, errs[0]
+	code, body, err := m.client.PostJSON(m.generateUrl([]string{action}), payload)
+	if err != nil {
+		return nil, err
 	}
 
 	if m.client.debug {
@@ -466,9 +476,9 @@ func (m *ManticoreClient) bulkUpsert(action string, v ...MCDocumentBulkUpsertReq
 	}
 
 	// Request
-	code, body, errs := m.client.PostNDJSON(m.generateUrl([]string{MCApiRouteBulk}), payload.Bytes())
-	if len(errs) > 0 {
-		return nil, errs[0]
+	code, body, err := m.client.PostNDJSON(m.generateUrl([]string{MCApiRouteBulk}), payload.Bytes())
+	if err != nil {
+		return nil, err
 	}
 
 	if m.client.debug {
@@ -511,10 +521,13 @@ func (m *ManticoreClient) Delete(v MCDocumentDeleteRequest) (resp *MCDocumentRes
 		return nil, errors.New("readonly mode active")
 	}
 
+	// payload
+	payload, _ := v.MarshalBinary()
+
 	// Request
-	code, body, errs := m.client.PostJSON(m.generateUrl([]string{MCApiRouteDelete}), v)
-	if len(errs) > 0 {
-		return nil, errs[0]
+	code, body, err := m.client.PostJSON(m.generateUrl([]string{MCApiRouteDelete}), payload)
+	if err != nil {
+		return nil, err
 	}
 
 	if m.client.debug {
@@ -585,10 +598,13 @@ Escape Characters: !    "    $    '    (    )    -    /    <    @    \    ^    |
 All full-text match clauses can be combined with must, must_not and should operators of an HTTP bool query.
 */
 func (m *ManticoreClient) Search(builder *McSearchQueryBuilder) (resp *McSearchResponse, err error) {
+	// payload
+	payload, _ := builder.MarshalBinary()
+
 	// Request
-	code, body, errs := m.client.PostJSON(m.generateUrl([]string{MCApiRouteSearch}), &builder)
-	if len(errs) > 0 {
-		return nil, errs[0]
+	code, body, err := m.client.PostJSON(m.generateUrl([]string{MCApiRouteSearch}), payload)
+	if err != nil {
+		return nil, err
 	}
 
 	if m.client.debug {

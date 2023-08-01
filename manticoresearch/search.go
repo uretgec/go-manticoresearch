@@ -51,7 +51,7 @@ type McSearchResponseSource struct {
 	Maker   string `json:"maker,omitempty" redis:"maker"`
 	Website string `json:"website,omitempty" redis:"website"`
 
-	Score    int `json:"score,omitempty" redis:"score"`
+	Score    int64 `json:"score,omitempty" redis:"score"`
 	Priority int `json:"priority,omitempty" redis:"priority"`
 	Price    int `json:"price,omitempty" redis:"price"`
 

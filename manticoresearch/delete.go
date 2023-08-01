@@ -1,5 +1,7 @@
 package manticoresearch
 
+import "encoding/json"
+
 // Delete Document
 type MCDocumentDeleteRequest struct {
 	// Index name
@@ -10,4 +12,15 @@ type MCDocumentDeleteRequest struct {
 	Id uint64 `json:"id,omitempty"`
 	// Query tree object
 	Query *interface{} `json:"query,omitempty"`
+}
+
+func (mc *MCDocumentDeleteRequest) MarshalBinary() ([]byte, error) {
+	return json.Marshal(mc)
+}
+func (mc *MCDocumentDeleteRequest) UnmarshalBinary(data []byte) error {
+	if err := json.Unmarshal(data, &mc); err != nil {
+		return err
+	}
+
+	return nil
 }
